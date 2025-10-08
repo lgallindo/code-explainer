@@ -1,0 +1,15 @@
+[project]
+name = "code-explainer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "ipython>=9.6.0",
+    "mistune>=3.1.4",
+    "openai>=2.2.0",
+    "requests>=2.32.5",
+    "rich>=13.9.4",
+    "streamlit>=1.40.0",
+    "toyaikit>=0.0.4",
+]
