@@ -42,6 +42,8 @@ class GithubRepositoryDataReader:
 
         if allowed_extensions is not None:
             self.allowed_extensions = {ext.lower() for ext in allowed_extensions}
+        else:
+            self.allowed_extensions = None
 
         if filename_filter is None:
             self.filename_filter = lambda filepath: True

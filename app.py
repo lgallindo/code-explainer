@@ -1,19 +1,17 @@
 import streamlit as st
-from explainer.agent import load_github_repo, analyze
+from explainer.agent import analyze
+from explainer.github import GithubRepositoryDataReader
 from toyaikit.llm import OpenAIClient
 from toyaikit.chat.runners import RunnerCallback
-import time
+import re
 
 
 class StreamlitCallback(RunnerCallback):
-    """Callback to display analysis progress in Streamlit."""
-    
     def __init__(self, status_container):
         self.status_container = status_container
         self.messages = []
     
     def on_function_call(self, function_call, result):
-        """Display function calls as they happen."""
         func_name = function_call.name
         try:
             import json
@@ -27,19 +25,23 @@ class StreamlitCallback(RunnerCallback):
         self.status_container.markdown("\n\n".join(self.messages))
     
     def on_message(self, message):
-        """Display AI messages."""
         pass
     
     def on_reasoning(self, reasoning):
-        """Display reasoning if available."""
         if reasoning:
             msg = f"💭 *{reasoning}*"
             self.messages.append(msg)
             self.status_container.markdown("\n\n".join(self.messages))
     
     def on_response(self, response):
-        """Handle response callback."""
         pass
+
+
+def parse_github_url(url: str):
+    match = re.match(r'https://github\.com/([^/]+)/([^/]+)', url.strip())
+    if match:
+        return match.group(1), match.group(2)
+    return None, None
 
 
 def main():
@@ -50,9 +52,7 @@ def main():
     )
     
     st.title("🔍 GitHub Repository Code Analyzer")
-    st.markdown("Analyze code repositories with AI-powered tools")
     
-    # Initialize session state
     if 'repo_files' not in st.session_state:
         st.session_state.repo_files = None
     if 'llm_client' not in st.session_state:
@@ -62,93 +62,61 @@ def main():
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
     
-    # Sidebar for repository setup
-    with st.sidebar:
-        st.header("📦 Repository Setup")
-        
-        repo_owner = st.text_input("Repository Owner", placeholder="e.g., openai")
-        repo_name = st.text_input("Repository Name", placeholder="e.g., openai-python")
-        
-        extensions_input = st.text_input(
-            "File Extensions (comma-separated)",
-            value="py,js,ts,jsx,tsx,java,go,rs,cpp,c,h"
+    if st.session_state.repo_files is None:
+        github_url = st.text_input(
+            "GitHub Repository URL",
+            placeholder="https://github.com/alexeygrigorev/toyaikit"
         )
         
-        model = st.selectbox(
-            "OpenAI Model",
-            ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"],
-            index=0
-        )
-        
-        if st.button("Load Repository", type="primary"):
-            if not repo_owner or not repo_name:
-                st.error("Please enter both repository owner and name")
-            else:
-                with st.spinner(f"Downloading {repo_owner}/{repo_name}..."):
+        if github_url:
+            repo_owner, repo_name = parse_github_url(github_url)
+            
+            if repo_owner and repo_name:
+                with st.spinner(f"Loading {repo_owner}/{repo_name}..."):
                     try:
-                        allowed_extensions = [ext.strip() for ext in extensions_input.split(',')]
-                        st.session_state.repo_files = load_github_repo(
+                        reader = GithubRepositoryDataReader(
                             repo_owner=repo_owner,
                             repo_name=repo_name,
-                            allowed_extensions=allowed_extensions
+                            allowed_extensions=None
                         )
-                        st.session_state.llm_client = OpenAIClient(model=model)
-                        st.session_state.conversation_messages = None
-                        st.session_state.chat_history = []
-                        st.success(f"✅ Loaded {len(st.session_state.repo_files)} files")
+                        repo_files_list = reader.read()
+                        st.session_state.repo_files = {f.filename: f.content for f in repo_files_list}
+                        st.session_state.llm_client = OpenAIClient(model="gpt-4o-mini")
+                        st.rerun()
                     except Exception as e:
-                        st.error(f"❌ Error: {str(e)}")
-        
-        # Show repository stats if loaded
-        if st.session_state.repo_files:
-            st.divider()
-            st.subheader("📊 Repository Stats")
-            st.metric("Total Files", len(st.session_state.repo_files))
-            
-            # File extension breakdown
-            extensions = {}
-            for filename in st.session_state.repo_files.keys():
-                ext = filename.split('.')[-1] if '.' in filename else 'no-ext'
-                extensions[ext] = extensions.get(ext, 0) + 1
-            
-            with st.expander("File Types"):
-                for ext, count in sorted(extensions.items(), key=lambda x: x[1], reverse=True)[:10]:
-                    st.text(f"{ext}: {count}")
-        
-        # Conversation controls
-        if st.session_state.repo_files:
-            st.divider()
-            st.subheader("💬 Conversation")
-            
-            if st.session_state.conversation_messages:
-                st.info(f"🔗 Continuing conversation ({len(st.session_state.chat_history)} messages)")
-                if st.button("🆕 Start New Chat"):
-                    st.session_state.conversation_messages = None
-                    st.session_state.chat_history = []
-                    st.rerun()
+                        st.error(f"Error: {str(e)}")
             else:
-                st.info("💭 New conversation")
-    
-    # Main content area
-    if not st.session_state.repo_files:
-        st.info("👈 Please load a repository from the sidebar to begin")
+                st.error("Invalid GitHub URL format")
     else:
-        # Question input
-        st.subheader("❓ Ask a Question")
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.info(f"📁 Repository loaded: {len(st.session_state.repo_files)} files")
+        with col2:
+            if st.button("Reset"):
+                st.session_state.repo_files = None
+                st.session_state.conversation_messages = None
+                st.session_state.chat_history = []
+                st.rerun()
+        
+        st.divider()
         
         question = st.text_area(
-            "Enter your question about the codebase",
-            placeholder="Examples:\n- How do agents communicate with each other?\n- What design patterns are used?\n- Can you show me an example? (follow-up)",
-            height=150,
-            key="question_input"
+            "Ask a question about the codebase",
+            placeholder="How does this work?",
+            height=100
         )
         
         col1, col2 = st.columns([1, 5])
         with col1:
             analyze_btn = st.button("🔍 Analyze", type="primary", use_container_width=True)
+        with col2:
+            if st.session_state.conversation_messages:
+                if st.button("🆕 New Conversation"):
+                    st.session_state.conversation_messages = None
+                    st.session_state.chat_history = []
+                    st.rerun()
         
         if analyze_btn and question:
-            # Create containers for status and result
             status_container = st.empty()
             
             with st.spinner("Analyzing..."):
@@ -163,52 +131,49 @@ def main():
                         previous_messages=st.session_state.conversation_messages
                     )
                     
-                    # Update conversation messages for next turn
                     st.session_state.conversation_messages = report.messages
-                    
-                    # Add to chat history
                     st.session_state.chat_history.append({
                         'question': question,
                         'answer': report.answer,
                         'files': report.files_analyzed,
-                        'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
+                        'tokens': report.tokens,
+                        'cost': report.cost
                     })
                     
-                    # Clear status
                     status_container.empty()
-                    
-                    # Clear question input
                     st.rerun()
                     
                 except Exception as e:
-                    st.error(f"❌ Error: {str(e)}")
+                    st.error(f"Error: {str(e)}")
                     import traceback
                     st.code(traceback.format_exc())
         
-        # Display chat history
         if st.session_state.chat_history:
             st.divider()
-            st.subheader("💬 Chat History")
             
-            for idx, item in enumerate(reversed(st.session_state.chat_history)):
-                with st.container():
-                    st.markdown(f"**🕒 {item['timestamp']}**")
+            for item in reversed(st.session_state.chat_history):
+                with st.chat_message("user"):
+                    st.markdown(item['question'])
+                
+                with st.chat_message("assistant"):
+                    st.markdown(item['answer'])
                     
-                    # Question
-                    with st.chat_message("user"):
-                        st.markdown(item['question'])
-                    
-                    # Answer
-                    with st.chat_message("assistant"):
-                        st.markdown(item['answer'])
-                        
+                    col1, col2 = st.columns(2)
+                    with col1:
                         if item['files']:
-                            with st.expander(f"📁 Files Analyzed ({len(item['files'])})"):
+                            with st.expander(f"📁 Files analyzed ({len(item['files'])})"):
                                 for file in item['files']:
                                     st.text(f"  • {file}")
-                    
-                    if idx < len(st.session_state.chat_history) - 1:
-                        st.divider()
+                    with col2:
+                        if item.get('cost'):
+                            cost = item['cost']
+                            tokens = item.get('tokens')
+                            with st.expander(f"💰 Cost: ${cost.total_cost:.4f}"):
+                                if tokens:
+                                    st.text(f"Input tokens: {tokens.input_tokens}")
+                                    st.text(f"Output tokens: {tokens.output_tokens}")
+                                st.text(f"Input cost: ${cost.input_cost:.4f}")
+                                st.text(f"Output cost: ${cost.output_cost:.4f}")
 
 
 if __name__ == "__main__":

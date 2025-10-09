@@ -12,10 +12,14 @@ class AnalysisReport:
         answer: The AI-generated answer to the analysis question
         files_analyzed: List of file paths that were examined during analysis
         messages: All conversation messages for continuing the chat
+        tokens: Token usage information
+        cost: Cost information for this analysis
     """
     answer: str
     files_analyzed: list[str]
     messages: list = None
+    tokens: object = None
+    cost: object = None
 
 
 class FileTools:
@@ -442,44 +446,18 @@ DO NOT provide generic or high-level explanations. The user wants DEEP technical
         llm_client=llm_client
     )
     
-    messages = runner.loop(
+    result = runner.loop(
         prompt=question,
         previous_messages=previous_messages,
         callback=callback
     )
     
-    # Extract the final answer from messages
-    final_answer = ""
-    for msg in reversed(messages):
-        # Handle both dict and object responses
-        if hasattr(msg, 'get'):
-            # It's a dict
-            if msg.get("type") == "message":
-                content = msg.get("content", [])
-                if content and len(content) > 0:
-                    if isinstance(content[0], dict):
-                        final_answer = content[0].get("text", "")
-                    else:
-                        final_answer = content[0].text if hasattr(content[0], 'text') else str(content[0])
-                    break
-        elif hasattr(msg, 'type'):
-            # It's an object (ResponseOutputMessage)
-            if msg.type == "message":
-                content = msg.content if hasattr(msg, 'content') else []
-                if content and len(content) > 0:
-                    # Handle ResponseOutputText objects
-                    if hasattr(content[0], 'text'):
-                        final_answer = content[0].text
-                    elif isinstance(content[0], dict):
-                        final_answer = content[0].get("text", "")
-                    else:
-                        final_answer = str(content[0])
-                    break
-    
     return AnalysisReport(
-        answer=final_answer,
+        answer=result.last_message,
         files_analyzed=sorted(list(file_tools.files_analyzed)),
-        messages=messages
+        messages=result.all_messages,
+        tokens=result.tokens,
+        cost=result.cost
     )
 
 

@@ -11,5 +11,8 @@ dependencies = [
     "requests>=2.32.5",
     "rich>=13.9.4",
     "streamlit>=1.40.0",
-    "toyaikit>=0.0.4",
+    "toyaikit",
 ]
+
+[tool.uv.sources]
+toyaikit = { path = "../toyaikit", editable = true }
