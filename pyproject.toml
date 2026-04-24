@@ -14,5 +14,5 @@ dependencies = [
     "toyaikit",
 ]
 
-[tool.uv.sources]
-toyaikit = { path = "../toyaikit", editable = true }
+#[tool.uv.sources]
+#toyaikit = { path = "../toyaikit", editable = true }

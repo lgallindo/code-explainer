@@ -1,7 +1,7 @@
 import streamlit as st
 from explainer.agent import analyze
 from explainer.github import GithubRepositoryDataReader
-from toyaikit.llm import OpenAIClient
+from toyaikit.llm import OpenAIClient, GeminiClient, GeminiVertexClient
 from toyaikit.chat.runners import RunnerCallback
 import re
 
@@ -63,6 +63,15 @@ def main():
         st.session_state.chat_history = []
     
     if st.session_state.repo_files is None:
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            provider = st.selectbox("LLM Provider", ["OpenAI", "Gemini", "Gemini Vertex"], key="provider")
+        with col2:
+            if provider == "OpenAI":
+                model_name = st.selectbox("Model", ["gpt-4o-mini", "gpt-4o"], key="model_openai")
+            else:
+                model_name = st.selectbox("Model", ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"], key="model_gemini")
+        
         github_url = st.text_input(
             "GitHub Repository URL",
             placeholder="https://github.com/alexeygrigorev/toyaikit"
@@ -74,6 +83,20 @@ def main():
             if repo_owner and repo_name:
                 with st.spinner(f"Loading {repo_owner}/{repo_name}..."):
                     try:
+                        # Initialize LLM Client based on selection
+                        if provider == "OpenAI":
+                            st.session_state.llm_client = OpenAIClient(model=model_name)
+                        elif provider == "Gemini":
+                            st.session_state.llm_client = GeminiClient(
+                                model=model_name, 
+                                api_key="AIzaSyCuJ1da65C-NOkxyy6xmiJHvqxbaY28ORk"
+                            )
+                        elif provider == "Gemini Vertex":
+                            st.session_state.llm_client = GeminiVertexClient(
+                                model=model_name,
+                                project="autonomia-489716"
+                            )
+
                         reader = GithubRepositoryDataReader(
                             repo_owner=repo_owner,
                             repo_name=repo_name,
@@ -81,7 +104,6 @@ def main():
                         )
                         repo_files_list = reader.read()
                         st.session_state.repo_files = {f.filename: f.content for f in repo_files_list}
-                        st.session_state.llm_client = OpenAIClient(model="gpt-4o-mini")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
