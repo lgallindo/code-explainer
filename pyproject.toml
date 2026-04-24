@@ -5,6 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "google-cloud-aiplatform>=1.148.1",
+    "google-generativeai>=0.8.6",
     "ipython>=9.6.0",
     "mistune>=3.1.4",
     "openai>=2.2.0",
@@ -13,6 +15,9 @@ dependencies = [
     "streamlit>=1.40.0",
     "toyaikit",
 ]
+
+[tool.uv.sources]
+toyaikit = { path = "../toyaikit", editable = true }
 
 #[tool.uv.sources]
 #toyaikit = { path = "../toyaikit", editable = true }
