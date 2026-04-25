@@ -117,12 +117,19 @@ def get_latest_pro_model(models: list[str]) -> str:
     return models[0] if models else ''
 
 
+import json
+
+def save_chat(): Path('.private/chat.json').write_text(json.dumps(st.session_state.chat_history, default=str))
+def load_chat():
+    f = Path('.private/chat.json')
+    return json.loads(f.read_text()) if f.exists() else []
+
 def init_session_state():
     defaults = {
         'repo_files': None,
         'llm_client': None,
         'conversation_messages': None,
-        'chat_history': [],
+        'chat_history': load_chat(),
         'provider': get_streamlit_secret('provider', 'Gemini'),
         'openai_model': get_streamlit_secret('openai_model', PROVIDER_MODELS['OpenAI'][0]),
         'gemini_model': get_streamlit_secret('gemini_model', ''),
@@ -165,6 +172,7 @@ def get_llm_signature() -> tuple:
 def reset_conversation():
     st.session_state.conversation_messages = None
     st.session_state.chat_history = []
+    save_chat()
 
 
 def build_llm_client():
@@ -333,8 +341,8 @@ def main():
         
         question = st.text_area(
             "Ask a question about the codebase",
-            placeholder="How does this work?",
-            height=100
+            value="How does this work?\n\nI need high level and low level analysis. And how does it compares with standard FOSS tools and corporate-grade tools.\n\nTabulate features.",
+            height=150
         )
         
         col1, col2 = st.columns([1, 5])
@@ -345,6 +353,7 @@ def main():
                 if st.button("🆕 New Conversation"):
                     st.session_state.conversation_messages = None
                     st.session_state.chat_history = []
+                    save_chat()
                     st.rerun()
         
         if analyze_btn and question:
@@ -376,6 +385,7 @@ def main():
                         'tokens': report.tokens,
                         'cost': report.cost
                     })
+                    save_chat()
                     
                     status_container.empty()
                     st.rerun()
