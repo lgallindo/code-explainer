@@ -12,12 +12,18 @@ dependencies = [
     "openai>=2.2.0",
     "requests>=2.32.5",
     "rich>=13.9.4",
-    "streamlit>=1.40.0",
+    "streamlit>=1.56.0",
     "toyaikit",
+    "watchdog>=6.0.0",
 ]
 
 [tool.uv.sources]
 toyaikit = { path = "../toyaikit", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
 
 #[tool.uv.sources]
 #toyaikit = { path = "../toyaikit", editable = true }

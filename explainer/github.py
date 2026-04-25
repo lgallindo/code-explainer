@@ -1,4 +1,5 @@
 import io
+import logging
 import zipfile
 import traceback
 
@@ -6,6 +7,9 @@ from dataclasses import dataclass
 from typing import Iterable, Callable
 
 import requests
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -60,8 +64,11 @@ class GithubRepositoryDataReader:
         Raises:
             Exception: If the repository download fails
         """
+        logger.info("Downloading GitHub repository archive from %s", self.url)
         resp = requests.get(self.url)
+        logger.info("GitHub archive response status=%s url=%s", resp.status_code, self.url)
         if resp.status_code != 200:
+            logger.error("Failed to download repository archive: status=%s url=%s", resp.status_code, self.url)
             raise Exception(f"Failed to download repository: {resp.status_code}")
 
         zf = zipfile.ZipFile(io.BytesIO(resp.content))
